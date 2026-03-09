@@ -4,13 +4,13 @@ services:
     container_name: cubesat_postgres
     restart: always
     environment:
-      POSTGRES_USER: cubesat_admin
-      POSTGRES_PASSWORD: 14dQnsc14F3nQxjw42nc2Sdjc
-      POSTGRES_DB: cubesat_telemetry
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: telemetry
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
 volumes:
   postgres_data:
