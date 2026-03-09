@@ -5,10 +5,32 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model Telemetry {
+  id           Int      @id @default(autoincrement())
+  stationId    Int      @map("station_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  recordedAt   DateTime @map("recorded_at")
+  latitude     Float
+  longitude    Float
+  temperature  Float?
+  humidity     Float?
+  PM2_5        Float?
+  PM10         Float?
+  CO           Float?
+  SO2          Float?
+  NO2          Float?
+  O3           Float?
+  hourOfTheDay Int      @map("hour_of_the_day")
+  dayOfTheWeek Int      @map("day_of_the_week")
+  month        Int
+  anomalyScore Float?
+  isAnomaly    Boolean? @map("is_anomaly")
 }
