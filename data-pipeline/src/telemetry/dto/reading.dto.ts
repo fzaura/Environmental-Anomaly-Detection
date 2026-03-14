@@ -5,8 +5,9 @@ import { Type } from 'class-transformer';
 
 export class ReadingDto {
   @IsDefined()
-  @IsNumber()
-  readonly sensorsId!: number;
+  @Type(() => DateTimeDto)
+  @ValidateNested()
+  readonly datetime!: DateTimeDto;
 
   @IsDefined()
   @IsNumber()
@@ -18,7 +19,10 @@ export class ReadingDto {
   readonly coordinates!: CoordinatesDto;
 
   @IsDefined()
-  @Type(() => DateTimeDto)
-  @ValidateNested()
-  readonly datetime!: DateTimeDto;
+  @IsNumber()
+  readonly sensorsId!: number;
+
+  @IsDefined()
+  @IsNumber()
+  readonly locationId!: number;
 }
