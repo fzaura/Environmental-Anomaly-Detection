@@ -24,5 +24,5 @@ export class ReadingDto {
 
   @IsDefined()
   @IsNumber()
-  readonly locationId!: number;
+  readonly locationsId!: number;
 }
