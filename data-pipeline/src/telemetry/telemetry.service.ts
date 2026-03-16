@@ -1,41 +1,65 @@
 import { Injectable } from '@nestjs/common';
 import { ReadingDto } from './dto/reading.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { CoordinatesDto } from './dto/coordinate.dto';
 
 @Injectable()
 export class TelemetryService {
   private readonly sensorMap: Record<number, string> = {
-    4247: 'temperature',
-    4237: 'humidity',
-    4231: 'CO',
-    162: 'NO2',
+    3916: 'SO2',
+    3917: 'O3',
+    3918: 'NO2',
+    3919: 'PM10',
+    3920: 'PM2_5',
+    25227: 'CO',
+    4272103: 'temperature',
+    4272226: 'humidity',
   };
   constructor(private readonly prismaService: PrismaService) {}
 
   async saveTelemetry(data: ReadingDto[]) {
-    const { datetime, locationsId, coordinates } = data[0];
-    const aggregatedPayload = data.reduce((row, reading) => {
+    const groupedData: Record<string, Record<string, number | object>> = {};
+
+    data.forEach((reading) => {
       const readingType = this.sensorMap[reading.sensorsId];
+      const { datetime, locationsId, coordinates } = reading;
+      const isoString = datetime.utc.toISOString();
 
-      return { ...row, [readingType]: reading.value };
-    }, {});
+      if (!groupedData[isoString]) {
+        groupedData[isoString] = { locationsId, coordinates };
+      }
 
-    const hourOfTheDay = datetime.utc.getUTCHours();
-    const dayOfTheWeek = datetime.utc.getUTCDay();
-    const month = datetime.utc.getUTCMonth();
-    const { longitude, latitude } = coordinates;
-
-    await this.prismaService.telemetry.create({
-      data: {
-        ...aggregatedPayload,
-        hourOfTheDay,
-        dayOfTheWeek,
-        month,
-        stationId: locationsId,
-        recordedAt: datetime.utc,
-        longitude,
-        latitude,
-      },
+      if (readingType) {
+        groupedData[isoString] = {
+          ...groupedData[isoString],
+          [readingType]: reading.value,
+        };
+      }
     });
+    await Promise.all(
+      Object.entries(groupedData).map(([timestampKey, bucketValue]) => {
+        const { locationsId, coordinates, ...dynamicSensors } = bucketValue;
+        const datetime = new Date(timestampKey);
+
+        const hourOfTheDay = datetime.getUTCHours();
+        const dayOfTheWeek = datetime.getUTCDay();
+        const month = datetime.getUTCMonth() + 1;
+
+        const { longitude, latitude } = coordinates as CoordinatesDto;
+
+        return this.prismaService.telemetry.create({
+          data: {
+            stationId: locationsId as number,
+            longitude,
+            latitude,
+            hourOfTheDay,
+            dayOfTheWeek,
+            month,
+            recordedAt: datetime,
+            ...dynamicSensors,
+          },
+        });
+      }),
+    );
   }
 }
