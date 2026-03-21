@@ -33,4 +33,6 @@ model Telemetry {
   month        Int
   anomalyScore Float?
   isAnomaly    Boolean? @map("is_anomaly")
+
+  @@unique([stationId, recordedAt])
 }
