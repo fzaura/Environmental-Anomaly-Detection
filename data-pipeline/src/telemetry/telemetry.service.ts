@@ -47,8 +47,24 @@ export class TelemetryService {
 
         const { longitude, latitude } = coordinates as CoordinatesDto;
 
-        return this.prismaService.telemetry.create({
-          data: {
+        return this.prismaService.telemetry.upsert({
+          where: {
+            stationId_recordedAt: {
+              stationId: locationsId as number,
+              recordedAt: datetime,
+            },
+          },
+          update: {
+            stationId: locationsId as number,
+            longitude,
+            latitude,
+            hourOfTheDay,
+            dayOfTheWeek,
+            month,
+            recordedAt: datetime,
+            ...dynamicSensors,
+          },
+          create: {
             stationId: locationsId as number,
             longitude,
             latitude,
