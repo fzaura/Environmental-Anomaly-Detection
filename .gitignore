@@ -3,3 +3,7 @@ dist/
 .env
 .vscode/
 .idea/
+
+#for python:
+venv/
+__pycache__/
