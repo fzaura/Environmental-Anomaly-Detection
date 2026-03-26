@@ -25,7 +25,6 @@ interface OpenAqHistoricalResponse {
 export class OpenaqService {
   private readonly logger = new Logger(OpenaqService.name);
 
-  // Your exact sensor map mapping OpenAQ IDs to your database columns
   private readonly sensorMap: Record<number, string> = {
     3916: 'SO2',
     3917: 'O3',
@@ -43,7 +42,6 @@ export class OpenaqService {
     private readonly configService: ConfigService,
   ) {}
 
-  // LIVE HARVESTER (Runs automatically)
   @Cron(CronExpression.EVERY_30_MINUTES)
   async fetchFromOpenAq() {
     try {
@@ -75,12 +73,10 @@ export class OpenaqService {
     }
   }
 
-  // HISTORICAL SEEDER (Triggered manually via Controller)
   async seedHistoricalData() {
     this.logger.log('Starting historical data seeder...');
     const apiKey = this.configService.get<string>('X_API_KEY');
 
-    // Dynamically extract the numeric IDs from your map
     const targetSensors = Object.keys(this.sensorMap).map(Number);
 
     const datetimeFrom = '2026-01-01T00:00:00Z';
@@ -89,7 +85,6 @@ export class OpenaqService {
     let totalIngested = 0;
 
     try {
-      // Outer Loop: Iterate through each specific sensor
       for (const sensorId of targetSensors) {
         const sensorName = this.sensorMap[sensorId];
         this.logger.log(
@@ -98,7 +93,6 @@ export class OpenaqService {
 
         const baseUrl = `https://api.openaq.org/v3/sensors/${sensorId}/measurements`;
 
-        // Inner Loop: Fetch up to 5 pages (5,000 readings) per sensor
         for (let page = 1; page <= 5; page++) {
           this.logger.log(`Fetching page ${page} for ${sensorName}...`);
           const url = `${baseUrl}?datetime_from=${datetimeFrom}&datetime_to=${datetimeTo}&limit=1000&page=${page}`;
@@ -111,7 +105,6 @@ export class OpenaqService {
 
           const rawData = response.data.results;
 
-          // If a specific sensor has less than 5 pages of history, break early
           if (rawData.length === 0) {
             this.logger.log(
               `End of history reached for ${sensorName}. Moving to next sensor.`,
@@ -119,9 +112,7 @@ export class OpenaqService {
             break;
           }
 
-          // ADAPTER: Normalize the strictly-typed historical payload to perfectly match your ReadingDto
           const normalizedData = rawData.map((item) => {
-            // Safely extract the date object regardless of whether it is live or historical
             const rawDate =
               item.datetime || (item.period && item.period.datetimeTo);
 
@@ -130,7 +121,7 @@ export class OpenaqService {
               locationsId: 2178,
               value: item.value,
               datetime: {
-                utc: new Date(rawDate!.utc), // THE FIX: Instantiate a real JS Date object
+                utc: new Date(rawDate!.utc),
                 local: rawDate!.local,
               },
               coordinates: item.coordinates || {
@@ -140,13 +131,11 @@ export class OpenaqService {
             };
           });
 
-          // Pass the perfectly mapped data to your database
           await this.telemetryService.saveTelemetry(
             normalizedData as ReadingDto[],
           );
           totalIngested += normalizedData.length;
 
-          // Pause for 1 second to respect API rate limits and avoid bans
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
