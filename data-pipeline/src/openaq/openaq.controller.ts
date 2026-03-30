@@ -5,7 +5,6 @@ import { OpenaqService } from './openaq.service';
 export class OpenaqController {
   constructor(private readonly openaqService: OpenaqService) {}
 
-  // Trigger for the live harvester (Approach A)
   @Get('test-live')
   async testLiveFetch() {
     await this.openaqService.fetchFromOpenAq();
@@ -15,7 +14,6 @@ export class OpenaqController {
     };
   }
 
-  // Trigger for the historical seeder
   @Get('seed')
   async seedData() {
     return await this.openaqService.seedHistoricalData();

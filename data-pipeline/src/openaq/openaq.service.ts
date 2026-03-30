@@ -4,7 +4,7 @@ import { TelemetryService } from '../telemetry/telemetry.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
-import { ReadingDto } from '../telemetry/dto/reading.dto';
+import { ReadingDto } from '../telemetry/dto/openaq-reading.dto';
 
 interface OpenAqResponse {
   results: ReadingDto[];
@@ -42,7 +42,7 @@ export class OpenaqService {
     private readonly configService: ConfigService,
   ) {}
 
-  @Cron(CronExpression.EVERY_30_MINUTES)
+  @Cron(CronExpression.EVERY_HOUR)
   async fetchFromOpenAq() {
     try {
       this.logger.log('Waking up: Fetching live data from OpenAQ...');
