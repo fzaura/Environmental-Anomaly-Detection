@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telemetry Alerts - Minimal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            color: #111827;
+        }
+        .anomaly-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .anomaly-card:hover {
+            transform: translateY(-2px);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="min-h-screenflex flex-col">
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+        <div class="flex items-center space-x-4">
+            <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white font-bold h-full">T</div>
+            <h1 class="text-xl font-bold tracking-tight text-gray-900">Telemetry Monitor</h1>
+        </div>
+        <div class="flex items-center space-x-6 text-sm">
+            <div class="flex items-center space-x-2">
+                <span class="text-gray-500 font-medium">Status</span>
+                <span id="nav-connection-dot" class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                <span id="nav-connection-text" class="font-medium text-gray-700">Connecting</span>
+            </div>
+            <div class="flex items-center space-x-2 border-l border-gray-200 pl-6">
+                <span class="text-gray-500 font-medium">Uptime</span>
+                <span id="uptime" class="font-mono font-semibold text-gray-800 tracking-tight">00:00:00</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-8 py-8 grid grid-cols-12 gap-8">
+        
+        <!-- Left Column: Stats & Satellites -->
+        <div class="col-span-12 lg:col-span-3 space-y-6">
+            
+            <!-- Summary Box -->
+            <div class="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Total Anomalies</h3>
+                <div class="flex items-baseline space-x-2">
+                    <span id="total-anomalies" class="text-4xl font-bold text-gray-900">0</span>
+                    <span class="text-sm font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Alerts
+                    </span>
+                </div>
+            </div>
+
+            <!-- Satellites Box -->
+            <div class="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-semibold text-gray-800">Active Sources</h3>
+                    <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Live</span>
+                </div>
+                <ul id="active-satellites" class="space-y-3">
+                    <li class="text-sm text-gray-400 italic">Waiting for broadcast...</li>
+                </ul>
+            </div>
+            
+        </div>
+
+        <!-- Right Column: Alert Feed -->
+        <div class="col-span-12 lg:col-span-9 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-140px)]">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <h2 class="text-base font-semibold text-gray-800">Recent Incident Logs</h2>
+                <div class="flex items-center space-x-2 text-xs text-gray-500">
+                    <div class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                    <span>Monitoring stream</span>
+                </div>
+            </div>
+            
+            <div id="anomaly-feed" class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
+                <!-- Cards injected here -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Clock & Uptime
+        let serverStart = 0;
+        let uptimeInterval = null;
+        const uptimeDisplay = document.getElementById('uptime');
+
+        function updateUptimeDisplay() {
+            if (serverStart === 0) return;
+            const diffSeconds = Math.floor((Date.now() - serverStart) / 1000);
+            const h = Math.floor(diffSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((diffSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = Math.floor(diffSeconds % 60).toString().padStart(2, '0');
+            uptimeDisplay.innerText = `${h}:${m}:${s}`;
+        }
+
+        // Connection Variables
+        const socket = io('http://localhost:3000');
+        const navDot = document.getElementById('nav-connection-dot');
+        const navText = document.getElementById('nav-connection-text');
+        
+        let totalAnomaliesCount = 0;
+        const activeSatellitesMap = new Map();
+
+        // Socket Events
+        socket.on('connect', () => {
+            navDot.className = 'w-2.5 h-2.5 rounded-full bg-green-500';
+            navText.innerText = 'Connected';
+            navText.className = 'font-medium text-gray-700';
+        });
+
+        socket.on('serverStartTime', (time) => {
+            serverStart = time;
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            uptimeInterval = setInterval(updateUptimeDisplay, 1000);
+            updateUptimeDisplay();
+        });
+
+        socket.on('disconnect', () => {
+            navDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+            navText.innerText = 'Disconnected';
+            navText.className = 'font-medium text-red-600';
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            serverStart = 0;
+            uptimeDisplay.innerText = "--:--:--";
+        });
+
+        socket.on('historicalAnomalies', (reports) => {
+            const feed = document.getElementById('anomaly-feed');
+            feed.innerHTML = '';
+            totalAnomaliesCount = 0;
+            activeSatellitesMap.clear();
+
+            reports.slice().reverse().forEach(report => {
+                totalAnomaliesCount += report.TotalAnomaliesDetected;
+                document.getElementById('total-anomalies').innerText = totalAnomaliesCount;
+                activeSatellitesMap.set(report.SatelliteId, Date.now());
+                renderAnomalyCards(report);
+            });
+            updateSatellitesList();
+        });
+
+        socket.on('anomalyDetected', (report) => {
+            totalAnomaliesCount += report.TotalAnomaliesDetected;
+            document.getElementById('total-anomalies').innerText = totalAnomaliesCount;
+
+            activeSatellitesMap.set(report.SatelliteId, Date.now());
+            updateSatellitesList();
+
+            renderAnomalyCards(report);
+        });
+
+        function updateSatellitesList() {
+            const list = document.getElementById('active-satellites');
+            list.innerHTML = '';
+            activeSatellitesMap.forEach((lastSeen, satId) => {
+                list.innerHTML += `
+                    <li class="flex justify-between items-center bg-gray-50 border border-gray-100 rounded-md py-2 px-3">
+                        <div class="flex items-center space-x-2">
+                            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span class="text-sm font-medium text-gray-700">${satId}</span>
+                        </div>
+                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                    </li>
+                `;
+            });
+        }
+
+        const unitMap = {
+            PM2_5: 'ug/m3',
+            PM10: 'ug/m3',
+            CO: 'ppm',
+            O3: 'ppm',
+            Temperature: 'degC',
+            Humidity: '%'
+        };
+
+        function normalizeSensorKey(sensor) {
+            return sensor === 'temperature'
+                ? 'Temperature'
+                : sensor === 'humidity'
+                    ? 'Humidity'
+                    : sensor;
+        }
+
+        function formatSensorLabel(sensor) {
+            if (sensor === 'PM2_5') return 'PM2.5';
+            return sensor.replaceAll('_', ' ');
+        }
+
+        function isAnomalous(sensor, value) {
+            if (sensor === 'PM2_5' && value > 50) return true;
+            if (sensor === 'PM10' && value > 100) return true;
+            if (sensor === 'CO' && value > 1) return true;
+            if (sensor === 'O3' && value > 0.05) return true;
+            if (sensor === 'Temperature' && (value > 35 || value < -10)) return true;
+            if (sensor === 'Humidity' && (value > 90 || value < 10)) return true;
+            return false;
+        }
+
+        function renderCell(label, value, unit, key) {
+            const formattedValue = typeof value === 'number' ? parseFloat(value.toPrecision(5)) : value;
+            const anomalous = isAnomalous(key, value);
+            const colorClass = anomalous ? 'text-red-600 bg-red-50 font-bold' : 'text-gray-900 bg-white';
+            const borderClass = anomalous ? 'border-red-200' : 'border-gray-100';
+            
+            return `
+                <div class="border ${borderClass} rounded-lg p-3 ${colorClass} flex flex-col items-center justify-center text-center">
+                    <span class="text-xs text-gray-500 mb-1 font-medium ${anomalous ? 'text-red-400' : ''}">${label}</span>
+                    <div class="flex items-baseline space-x-1">
+                        <span class="text-lg">${formattedValue}</span>
+                        <span class="text-xs ${anomalous ? 'text-red-500' : 'text-gray-400'}">${unit}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAnomalyCards(report) {
+            const feed = document.getElementById('anomaly-feed');
+            
+            report.Events.forEach(event => {
+                const date = new Date(event.datetime.utc).toLocaleString();
+                
+                const card = document.createElement('div');
+                card.className = 'anomaly-card bg-white rounded-xl border border-gray-200 overflow-hidden';
+                
+                card.innerHTML = `
+                    <div class="px-5 py-3 border-b border-gray-100 bg-white flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center justify-center p-1.5 bg-red-100 text-red-600 rounded-md">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            </span>
+                            <div>
+                                <h4 class="text-sm font-bold text-gray-900">${report.SatelliteId}</h4>
+                                <p class="text-xs text-gray-500">${event.coordinates.latitude.toFixed(4)}, ${event.coordinates.longitude.toFixed(4)}</p>
+                            </div>
+                        </div>
+                        <div class="text-xs font-medium text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">${date}</div>
+                    </div>
+                    
+                    <div class="p-5">
+                        <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+                            ${Object.entries(event.sensorReadings || {}).map(([sensorKey, rawValue]) => {
+                                const normalizedKey = normalizeSensorKey(sensorKey);
+                                const label = formatSensorLabel(normalizedKey);
+                                const unit = unitMap[normalizedKey] || '';
+                                return renderCell(label, rawValue, unit, normalizedKey);
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                feed.insertBefore(card, feed.firstChild);
+            });
+            
+            while (feed.children.length > 50) {
+                feed.removeChild(feed.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

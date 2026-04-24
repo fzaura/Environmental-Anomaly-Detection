@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ground Control Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a; /* Slate 900 */
+            color: #cbd5e1; /* Slate 300 */
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, transparent 70%);
+        }
+
+        .orbitron {
+            font-family: 'Orbitron', 'sans-serif';
+        }
+
+        .console-card {
+            background: rgba(30, 41, 59, 0.7); /* Slate 800 semi transparent */
+            border: 1px solid #334155; /* Slate 700 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            border-radius: 0.5rem;
+            backdrop-filter: blur(8px);
+        }
+
+        .neon-accent {
+            color: #06b6d4; /* Cyan 500 */
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+        }
+
+        .neon-text-red {
+            color: #f43f5e; /* Rose 500 */
+            text-shadow: 0 0 8px rgba(244, 63, 94, 0.4);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-6">
+    <header class="flex justify-between items-center mb-8 console-card p-5 border-b border-[#06b6d4]">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-8 bg-[#06b6d4] rounded-sm"></div>
+            <h1 class="orbitron text-3xl font-bold tracking-widest text-slate-100">FZAURA <span class="text-[#06b6d4]">SYS</span></h1>
+        </div>
+        <div class="text-right flex items-center gap-5">
+            <div class="text-sm tracking-widest uppercase font-semibold text-slate-400">Uptime Sync</div>
+            <div id="uptime" class="orbitron text-2xl font-bold neon-accent tracking-wider">00:00:00</div>
+        </div>
+    </header>
+
+    <main class="flex-grow grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- Sidebar / Status -->
+        <aside class="col-span-1 flex flex-col gap-6">
+            <div class="console-card p-6 border-l w-full" style="border-left-color: #06b6d4; border-left-width: 4px;">
+                <h2 class="text-xl font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 orbitron tracking-wide">SYSTEM LINK</h2>
+                <div class="flex items-center gap-3 mb-5">
+                    <div id="connection-indicator" class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#f43f5e]"></div>
+                    <span id="connection-text" class="text-sm font-bold tracking-widest uppercase">OFFLINE</span>
+                </div>
+                <div class="pt-4 border-t border-slate-700 mt-2 bg-slate-800/30 p-3 rounded">
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-widest">Global Detections</div>
+                    <div id="total-anomalies" class="orbitron text-4xl font-bold neon-text-red mt-2">0</div>
+                </div>
+            </div>
+            
+            <div class="console-card p-6 flex-grow">
+                <h2 class="text-xl font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 orbitron tracking-wide">ACTIVE NODES</h2>
+                <ul id="active-satellites" class="space-y-3">
+                    <li class="text-sm text-slate-500 italic tracking-wide">Awaiting handshake...</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main Feed -->
+        <section class="col-span-1 lg:col-span-3 console-card p-6 flex flex-col">
+            <header class="flex justify-between items-center border-b border-slate-700 pb-4 mb-5">
+                <h2 class="text-xl font-bold text-slate-200 orbitron tracking-wide">TELEMETRY ALERTS</h2>
+                <div class="text-xs font-bold text-[#06b6d4] tracking-widest uppercase animate-pulse">Monitoring Streams...</div>
+            </header>
+            
+            <div id="anomaly-feed" class="flex-grow overflow-y-auto pr-2 space-y-5" style="max-height: 65vh;">
+                <!-- Anomalies will be dynamically injected here -->
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Clock & Uptime
+        let serverStart = 0;
+        let uptimeInterval = null;
+        const uptimeDisplay = document.getElementById('uptime');
+
+        function updateUptimeDisplay() {
+            if (serverStart === 0) return;
+            const diffSeconds = Math.floor((Date.now() - serverStart) / 1000);
+            const h = Math.floor(diffSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((diffSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = Math.floor(diffSeconds % 60).toString().padStart(2, '0');
+            uptimeDisplay.innerText = `${h}:${m}:${s}`;
+        }
+
+        // Websocket Connection
+        const socket = io('http://localhost:3000'); // Reverted port to match nest default configuration
+        const connectionIndicator = document.getElementById('connection-indicator');
+        const connectionText = document.getElementById('connection-text');
+        let totalAnomaliesCount = 0;
+        const activeSatellitesMap = new Map();
+
+        socket.on('connect', () => {
+            connectionIndicator.className = 'w-3 h-3 rounded-full bg-[#06b6d4] shadow-[0_0_8px_#06b6d4]';
+            connectionText.innerText = 'SECURE LINK ESTABLISHED';
+            connectionText.className = 'text-sm font-bold tracking-widest uppercase neon-accent';
+        });
+
+        socket.on('serverStartTime', (time) => {
+            serverStart = time;
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            uptimeInterval = setInterval(updateUptimeDisplay, 1000);
+            updateUptimeDisplay();
+        });
+
+        socket.on('disconnect', () => {
+            connectionIndicator.className = 'w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#f43f5e]';
+            connectionText.innerText = 'LINK SEVERED...';
+            connectionText.className = 'text-sm font-bold tracking-widest uppercase text-red-500';
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            serverStart = 0;
+            uptimeDisplay.innerText = "OFFLINE";
+        });
+
+        socket.on('historicalAnomalies', (reports) => {
+            const feed = document.getElementById('anomaly-feed');
+            feed.innerHTML = '';
+            totalAnomaliesCount = 0;
+            activeSatellitesMap.clear();
+
+            reports.slice().reverse().forEach(report => {
+                totalAnomaliesCount += report.TotalAnomaliesDetected;
+                document.getElementById('total-anomalies').innerText = totalAnomaliesCount;
+                activeSatellitesMap.set(report.SatelliteId, Date.now());
+                renderAnomalyCards(report);
+            });
+            updateSatellitesList();
+        });
+
+        socket.on('anomalyDetected', (report) => {
+            totalAnomaliesCount += report.TotalAnomaliesDetected;
+            document.getElementById('total-anomalies').innerText = totalAnomaliesCount;
+
+            activeSatellitesMap.set(report.SatelliteId, Date.now());
+            updateSatellitesList();
+
+            renderAnomalyCards(report);
+        });
+
+        function updateSatellitesList() {
+            const list = document.getElementById('active-satellites');
+            list.innerHTML = '';
+            activeSatellitesMap.forEach((lastSeen, satId) => {
+                list.innerHTML += `<li class="flex justify-between items-center bg-slate-800/50 rounded p-3 border border-slate-700">
+                    <span class="text-sm font-bold tracking-wider text-slate-200">${satId}</span>
+                    <span class="text-[10px] font-bold tracking-widest text-[#06b6d4] bg-[#06b6d4]/10 px-2 py-1 rounded">STREAMING</span>
+                </li>`;
+            });
+        }
+
+        const unitMap = {
+            PM2_5: 'ug',
+            PM10: 'ug',
+            CO: 'ppm',
+            O3: 'ppm',
+            Temperature: 'degC',
+            Humidity: '%'
+        };
+
+        function normalizeSensorKey(sensor) {
+            return sensor === 'temperature'
+                ? 'Temperature'
+                : sensor === 'humidity'
+                    ? 'Humidity'
+                    : sensor;
+        }
+
+        function formatSensorLabel(sensor) {
+            if (sensor === 'PM2_5') return 'PM2.5';
+            return sensor.replaceAll('_', ' ');
+        }
+
+        function isAnomalous(sensor, value) {
+            if (sensor === 'PM2_5' && value > 50) return true;
+            if (sensor === 'PM10' && value > 100) return true;
+            if (sensor === 'CO' && value > 1) return true;
+            if (sensor === 'O3' && value > 0.05) return true;
+            if (sensor === 'Temperature' && (value > 35 || value < -10)) return true;
+            if (sensor === 'Humidity' && (value > 90 || value < 10)) return true;
+            return false;
+        }
+
+        function renderAnomalyCards(report) {
+            const feed = document.getElementById('anomaly-feed');
+            
+            report.Events.forEach(event => {
+                const date = new Date(event.datetime.utc).toLocaleString();
+                
+                const card = document.createElement('div');
+                card.className = 'console-card p-5 border-l w-full transition-all duration-300 line-left relative';
+                card.style.borderLeftColor = '#f43f5e';
+                card.style.borderLeftWidth = '4px';
+                card.style.background = 'linear-gradient(90deg, rgba(244, 63, 94, 0.05) 0%, rgba(30, 41, 59, 0.7) 30%)';
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4 border-b border-slate-700/50 pb-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-100 orbitron tracking-wider">${report.SatelliteId}</h3>
+                            <div class="text-xs text-slate-400 mt-1 flex gap-4 font-semibold tracking-wide">
+                                <span>UTC: ${date}</span>
+                                <span>POS: [${event.coordinates.latitude.toFixed(4)}, ${event.coordinates.longitude.toFixed(4)}]</span>
+                            </div>
+                        </div>
+                        <div class="bg-rose-500/10 text-rose-500 border border-rose-500/30 px-3 py-1 rounded-sm text-xs font-bold uppercase tracking-widest">
+                            CRITICAL
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        ${Object.entries(event.sensorReadings || {}).map(([sensorKey, rawValue]) => {
+                            const normalizedKey = normalizeSensorKey(sensorKey);
+                            const label = formatSensorLabel(normalizedKey);
+                            const unit = unitMap[normalizedKey] || '';
+                            return renderReading(label, rawValue, unit, normalizedKey);
+                        }).join('')}
+                    </div>
+                `;
+                
+                feed.insertBefore(card, feed.firstChild);
+            });
+            
+            while (feed.children.length > 50) {
+                feed.removeChild(feed.lastChild);
+            }
+        }
+
+        function renderReading(label, value, unit, sensorKey) {
+            const numericValue = typeof value === 'number' ? value : parseFloat(value);
+            const formattedValue = !isNaN(numericValue) ? parseFloat(numericValue.toPrecision(5)) : value;
+            const anomalous = isAnomalous(sensorKey, numericValue);
+            
+            // Highlight text if anomalous, else use subdued color
+            const valueColor = anomalous ? 'text-rose-400 font-bold' : 'text-slate-100 font-semibold';
+            const bgColor = anomalous ? 'bg-rose-900/10 border-rose-500/20' : 'bg-slate-800 border-slate-700';
+
+            return `
+                <div class="${bgColor} rounded-sm p-3 border">
+                    <div class="flex justify-between items-center mb-1">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">${label}</div>
+                        ${anomalous ? '<div class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>' : ''}
+                    </div>
+                    <div class="text-xl orbitron tracking-wide ${valueColor}">${formattedValue} <span class="text-xs text-slate-500 tracking-normal font-sans">${unit}</span></div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
