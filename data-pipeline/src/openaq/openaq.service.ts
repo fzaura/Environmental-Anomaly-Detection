@@ -79,8 +79,8 @@ export class OpenaqService {
 
     const targetSensors = Object.keys(this.sensorMap).map(Number);
 
-    const datetimeFrom = '2026-01-01T00:00:00Z';
-    const datetimeTo = '2026-03-26T00:00:00Z';
+    const datetimeFrom = '2025-01-01T00:00:00Z';
+    const datetimeTo = '2025-08-26T00:00:00Z';
 
     let totalIngested = 0;
 

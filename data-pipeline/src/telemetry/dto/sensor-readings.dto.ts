@@ -1,4 +1,4 @@
-import { IsNumber } from 'class-validator';
+import { IsNumber, IsOptional } from 'class-validator';
 
 export class SensorReadingsDto {
   @IsNumber()
@@ -18,4 +18,12 @@ export class SensorReadingsDto {
 
   @IsNumber()
   Humidity!: number;
+
+  @IsOptional()
+  @IsNumber()
+  Absolute_Humidity_Proxy?: number;
+
+  @IsOptional()
+  @IsNumber()
+  CO_to_Temp_Ratio?: number;
 }

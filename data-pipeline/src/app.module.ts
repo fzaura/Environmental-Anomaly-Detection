@@ -6,6 +6,7 @@ import { TelemetryModule } from './telemetry/telemetry.module';
 import { OpenaqModule } from './openaq/openaq.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ConfigModule } from '@nestjs/config';
     OpenaqModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot(),
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

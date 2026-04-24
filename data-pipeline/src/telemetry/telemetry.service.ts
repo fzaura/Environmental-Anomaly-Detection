@@ -5,6 +5,7 @@ import { CoordinatesDto } from './dto/coordinate.dto';
 import { CubesatReading } from './dto/cubesat-reading.dto';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class TelemetryService {
@@ -23,6 +24,7 @@ export class TelemetryService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
+    private readonly eventsGateway: EventsGateway,
   ) {
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -97,6 +99,9 @@ export class TelemetryService {
 
   async sendAnomalyReportToUser(report: CubesatReading) {
     console.log('Anomalies detected. Sending report to user');
+
+    // Broadcast to connected dashboard clients
+    this.eventsGateway.broadcastAnomaly(report);
 
     const eventsHtml = report.Events.map(
       (event, index) => `
