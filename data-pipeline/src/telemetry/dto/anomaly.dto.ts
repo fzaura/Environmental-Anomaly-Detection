@@ -1,5 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsDefined, ValidateNested } from 'class-validator';
+import {
+  IsDefined,
+  ValidateNested,
+  IsOptional,
+  IsArray,
+  IsString,
+} from 'class-validator';
 import { DateTimeDto } from './datetime.dto';
 import { CoordinatesDto } from './coordinate.dto';
 import { SensorReadingsDto } from './sensor-readings.dto';
@@ -19,4 +25,9 @@ export class AnomalyDto {
   @Type(() => SensorReadingsDto)
   @ValidateNested()
   readonly sensorReadings!: SensorReadingsDto;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  readonly anomalous_features?: string[];
 }

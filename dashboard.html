@@ -245,7 +245,8 @@
                             const normalizedKey = normalizeSensorKey(sensorKey);
                             const label = formatSensorLabel(normalizedKey);
                             const unit = unitMap[normalizedKey] || '';
-                            return renderReading(label, rawValue, unit, normalizedKey);
+                            const isAnom = event.anomalous_features?.includes(normalizedKey) || isAnomalous(normalizedKey, rawValue);
+                            return renderReading(label, rawValue, unit, isAnom);
                         }).join('')}
                     </div>
                 `;
@@ -258,10 +259,9 @@
             }
         }
 
-        function renderReading(label, value, unit, sensorKey) {
+        function renderReading(label, value, unit, anomalous) {
             const numericValue = typeof value === 'number' ? value : parseFloat(value);
             const formattedValue = !isNaN(numericValue) ? parseFloat(numericValue.toPrecision(5)) : value;
-            const anomalous = isAnomalous(sensorKey, numericValue);
             
             // Highlight text if anomalous, else use subdued color
             const valueColor = anomalous ? 'text-rose-400 font-bold' : 'text-slate-100 font-semibold';

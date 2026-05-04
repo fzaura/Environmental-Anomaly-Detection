@@ -219,9 +219,8 @@
             return false;
         }
 
-        function renderCell(label, value, unit, key) {
+        function renderCell(label, value, unit, anomalous) {
             const formattedValue = typeof value === 'number' ? parseFloat(value.toPrecision(5)) : value;
-            const anomalous = isAnomalous(key, value);
             const colorClass = anomalous ? 'text-red-600 bg-red-50 font-bold' : 'text-gray-900 bg-white';
             const borderClass = anomalous ? 'border-red-200' : 'border-gray-100';
             
@@ -265,7 +264,8 @@
                                 const normalizedKey = normalizeSensorKey(sensorKey);
                                 const label = formatSensorLabel(normalizedKey);
                                 const unit = unitMap[normalizedKey] || '';
-                                return renderCell(label, rawValue, unit, normalizedKey);
+                                const isAnom = event.anomalous_features?.includes(normalizedKey) || isAnomalous(normalizedKey, rawValue);
+                                return renderCell(label, rawValue, unit, isAnom);
                             }).join('')}
                         </div>
                     </div>

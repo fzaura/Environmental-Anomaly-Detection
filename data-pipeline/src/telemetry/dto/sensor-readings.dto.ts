@@ -1,17 +1,20 @@
 import { IsNumber, IsOptional } from 'class-validator';
 
 export class SensorReadingsDto {
+  @IsOptional()
   @IsNumber()
-  PM10!: number;
+  PM10?: number;
 
+  @IsOptional()
   @IsNumber()
-  PM2_5!: number;
+  PM2_5?: number;
 
   @IsNumber()
   CO!: number;
 
+  @IsOptional()
   @IsNumber()
-  O3!: number;
+  O3?: number;
 
   @IsNumber()
   Temperature!: number;

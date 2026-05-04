@@ -120,29 +120,44 @@ export class TelemetryService {
             </tr>
           </thead>
           <tbody>
-            <tr>
+            ${
+              event.sensorReadings.PM2_5 !== undefined
+                ? `
+            <tr ${event.anomalous_features?.includes('PM2_5') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">PM2.5</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.PM2_5}</td>
-            </tr>
-            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('PM2_5') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.PM2_5}</td>
+            </tr>`
+                : ''
+            }
+            ${
+              event.sensorReadings.PM10 !== undefined
+                ? `
+            <tr ${event.anomalous_features?.includes('PM10') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">PM10</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.PM10}</td>
-            </tr>
-            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('PM10') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.PM10}</td>
+            </tr>`
+                : ''
+            }
+            <tr ${event.anomalous_features?.includes('CO') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">CO</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.CO}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('CO') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.CO}</td>
             </tr>
-            <tr>
+            ${
+              event.sensorReadings.O3 !== undefined
+                ? `
+            <tr ${event.anomalous_features?.includes('O3') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">O3</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.O3}</td>
-            </tr>
-            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('O3') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.O3}</td>
+            </tr>`
+                : ''
+            }
+            <tr ${event.anomalous_features?.includes('Temperature') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Temperature</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.Temperature}°C</td>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('Temperature') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.Temperature}°C</td>
             </tr>
-            <tr>
+            <tr ${event.anomalous_features?.includes('Humidity') ? 'style="background-color: #ffcccc;"' : ''}>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Humidity</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${event.sensorReadings.Humidity}%</td>
+              <td style="padding: 8px; border: 1px solid #ddd; ${event.anomalous_features?.includes('Humidity') ? 'color: #d9534f; font-weight: bold;' : ''}">${event.sensorReadings.Humidity}%</td>
             </tr>
           </tbody>
         </table>
